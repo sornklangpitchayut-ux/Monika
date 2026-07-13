@@ -24,7 +24,6 @@ let menuItems = [
 ];
 
 // ⏰ --- AUTO-RESTOCK ENGINE (Every 7 Seconds) ---
-// This background process checks if any item is below its max limit and increments it safely.
 setInterval(() => {
     let stockChanged = false;
 
@@ -36,15 +35,14 @@ setInterval(() => {
         }
     });
 
-    // If any items were updated, broadcast the new stock levels to all screens instantly
     if (stockChanged) {
         io.emit('update_stock', menuItems);
         console.log(`[Auto-Restock] Inventory topped up at ${new Date().toLocaleTimeString()}`);
     }
-}, 7000); // 7000 milliseconds = 7 seconds
+}, 7000);
 
 
-// 1. Customer Ordering UI Template Generator
+// 1. Customer Ordering UI Template Generator (Upgraded with Cart Adjustments)
 function getTableHTML(tableNum) {
     return `
     <!DOCTYPE html>
@@ -58,13 +56,16 @@ function getTableHTML(tableNum) {
             h1 { color: #e74c3c; text-align: center; }
             .banner { text-align: center; font-weight: bold; color: white; background: #c0392b; padding: 8px; border-radius: 4px; margin-bottom: 15px; }
             .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 500px; margin: 0 auto; }
-            .card { background: white; border-radius: 6px; padding: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #eee; }
+            .card { background: white; border-radius: 6px; padding: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #eee; display: flex; flex-direction: column; justify-content: space-between; }
             .stock-lbl { font-size: 0.8rem; color: #27ae60; font-weight: bold; margin: 6px 0; }
             .stock-lbl.out { color: #7f8c8d; }
             .btn { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
             .btn:disabled { background: #bdc3c7; cursor: not-allowed; }
             .cart { max-width: 500px; margin: 20px auto; background: white; padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-            .cart-item { display: flex; justify-content: space-between; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+            .cart-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+            .qty-controls { display: flex; align-items: center; gap: 4px; }
+            .btn-sm { padding: 4px 8px; font-size: 0.8rem; background: #e2e8f0; color: #333; border-radius: 3px; border: none; font-weight: bold; cursor: pointer; }
+            .btn-del { background: #fee2e2; color: #ef4444; }
             .btn-send { background: #2ecc71; font-size: 1.1rem; padding: 10px; width:100%; border:none; color:white; border-radius:4px; font-weight:bold; cursor:pointer;}
         </style>
         <script src="/socket.io/socket.io.js"></script>
@@ -115,7 +116,32 @@ function getTableHTML(tableNum) {
                 var match = liveMenu.find(function(x){ return x.id === id; });
                 var inside = cart[id] ? cart[id].quantity : 0;
                 if(inside >= match.stock) { alert('ขออภัย วัตถุดิบมีไม่พอ!'); return; }
-                if(cart[id]) { cart[id].quantity++; } else { cart[id] = { id: match.id, name: match.name, price: match.price, quantity: 1 }; }
+                if(cart[id]) { 
+                    cart[id].quantity++; 
+                } else { 
+                    cart[id] = { id: match.id, name: match.name, price: match.price, quantity: 1 }; 
+                }
+                renderCart();
+            }
+
+            function changeQuantity(id, delta) {
+                if (!cart[id]) return;
+                var match = liveMenu.find(function(x){ return x.id === id; });
+                
+                if (delta > 0 && cart[id].quantity >= match.stock) {
+                    alert('ขออภัย วัตถุดิบมีจำกัด ไม่สามารถเพิ่มรายการได้มากกว่าสต๊อกปัจจุบันได้ครับ!');
+                    return;
+                }
+                
+                cart[id].quantity += delta;
+                if (cart[id].quantity <= 0) {
+                    delete cart[id];
+                }
+                renderCart();
+            }
+
+            function deleteItem(id) {
+                delete cart[id];
                 renderCart();
             }
 
@@ -128,11 +154,19 @@ function getTableHTML(tableNum) {
                     var item = cart[keys[i]];
                     total += item.price * item.quantity;
                     html += '<div class="cart-item">' +
-                        '<span>' + item.name + ' (x' + item.quantity + ')</span>' +
-                        '<span>' + (item.price * item.quantity) + ' บาท</span>' +
+                        '<div>' +
+                            '<strong>' + item.name + '</strong><br>' +
+                            '<small style="color:#7f8c8d;">' + item.price + ' บ. x ' + item.quantity + '</small>' +
+                        '</div>' +
+                        '<div class="qty-controls">' +
+                            '<button class="btn-sm" onclick="changeQuantity(' + item.id + ', -1)">-</button>' +
+                            '<span>' + item.quantity + '</span>' +
+                            '<button class="btn-sm" onclick="changeQuantity(' + item.id + ', 1)">+</button>' +
+                            '<button class="btn-sm btn-del" onclick="deleteItem(' + item.id + ')">🗑️</button>' +
+                        '</div>' +
                     '</div>';
                 }
-                container.innerHTML = html || '<p style="color:#aaa;">ยังไม่ได้เลือกรายการอาหาร</p>';
+                container.innerHTML = html || '<p style="color:#aaa;text-align:center;">ยังไม่ได้เลือกรายการอาหาร</p>';
                 document.getElementById('total-price').innerText = total;
             }
 
@@ -224,7 +258,7 @@ const kitchenHTML = `
                 container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#7f8c8d; padding:20px;">📭 ไม่มีออเดอร์ค้างในระบบครับ...</div>';
                 return;
             }
-            container.innerHTML = localOrders.map(order => \`
+            container.innerHTML = localOrders.map(order => `
                 <div class="order-card">
                     <div>
                         <div class="order-header">
@@ -232,17 +266,17 @@ const kitchenHTML = `
                             <span style="color: #7f8c8d;">🕒 \${order.time}</span>
                         </div>
                         <ul class="food-list">
-                            \${order.foods.map(food => \`
+                            \${order.foods.map(food => `
                                 <li class="food-item">
                                     <span>\${food.name}</span>
                                     <span class="food-qty">x \${food.quantity}</span>
                                 </li>
-                            \`).join('')}
+                            `).join('')}
                         </ul>
                     </div>
                     <button class="btn-complete" onclick="completeOrder(\${order.id})">เสิร์ฟแล้ว / เคลียร์ออเดอร์ ✅</button>
                 </div>
-            \`).join('');
+            `).join('');
         }
 
         function completeOrder(orderId) {
@@ -254,7 +288,7 @@ const kitchenHTML = `
 </body>
 </html>`;
 
-// 3. Manager UI Template (Allows Manual Controls + Displays Automated Counter Status)
+// 3. Manager UI Template
 const managerHTML = `
 <!DOCTYPE html>
 <html lang="th">
@@ -324,17 +358,28 @@ const managerHTML = `
 </html>`;
 
 
-// --- 🛠️ 4. Express Routing Setup ---
+// --- 🛠️ 4. Express Routing Setup (Updated for multiple entry variants) ---
+
+// Catch default root route
 app.get('/', (req, res) => res.send(getTableHTML(1)));
+
+// Pattern A: Matches standard clean routes -> /table/2
 app.get('/table/:num', (req, res) => res.send(getTableHTML(req.params.num)));
 
-// Kitchen Dashboard Aliases
+// Pattern B: Matches explicit suffix styles -> /table2.html
+app.get('/table:num.html', (req, res) => res.send(getTableHTML(req.params.num)));
+
+// Pattern C: Matches flat variants -> /table2
+app.get('/table:num', (req, res) => res.send(getTableHTML(req.params.num)));
+
+
+// Kitchen Routing Configurations
 app.get('/kitchen', (req, res) => res.send(kitchenHTML));
 app.get('/Kitchen', (req, res) => res.send(kitchenHTML));
 app.get('/kitchen.html', (req, res) => res.send(kitchenHTML));
 app.get('/Kitchen.html', (req, res) => res.send(kitchenHTML));
 
-// Manager Dashboard Aliases
+// Manager Routing Configurations
 app.get('/manager', (req, res) => res.send(managerHTML));
 app.get('/Manager', (req, res) => res.send(managerHTML));
 app.get('/manager.html', (req, res) => res.send(managerHTML));
