@@ -38,9 +38,10 @@ function getTableHTML(tableNum) {
             .banner { text-align: center; font-weight: bold; color: white; background: #c0392b; padding: 8px; border-radius: 4px; margin-bottom: 15px; }
             .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 500px; margin: 0 auto; }
             .card { background: white; border-radius: 6px; padding: 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #eee; }
-            .stock-lbl { font-size: 0.8rem; color: #7f8c8d; margin-bottom: 8px; }
+            .stock-lbl { font-size: 0.8rem; color: #27ae60; font-weight: bold; margin: 6px 0; }
+            .stock-lbl.out { color: #7f8c8d; }
             .btn { background: #e74c3c; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
-            .btn:disabled { background: #bdc3c7; }
+            .btn:disabled { background: #bdc3c7; cursor: not-allowed; }
             .cart { max-width: 500px; margin: 20px auto; background: white; padding: 15px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
             .cart-item { display: flex; justify-content: space-between; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
             .btn-send { background: #2ecc71; font-size: 1.1rem; padding: 10px; width:100%; border:none; color:white; border-radius:4px; font-weight:bold; cursor:pointer;}
@@ -81,7 +82,7 @@ function getTableHTML(tableNum) {
                     html += '<div class="card">' +
                         '<div><strong>' + item.name + '</strong></div>' +
                         '<div style="color:#c0392b;margin:4px 0;">' + item.price + ' THB</div>' +
-                        '<div class="stock-lbl">' + (isOut ? '❌ Out of Stock' : 'Stock: ' + item.stock + ' left') + '</div>' +
+                        '<div class="stock-lbl ' + (isOut ? 'out' : '') + '">' + (isOut ? '❌ Out of Stock' : 'Stock: ' + item.stock + ' left') + '</div>' +
                         '<button class="btn" onclick="addToCart(' + item.id + ')" ' + (isOut ? 'disabled' : '') + '>' + (isOut ? 'Sold Out' : 'Add ➕') + '</button>' +
                     '</div>';
                 }
@@ -92,7 +93,7 @@ function getTableHTML(tableNum) {
             function addToCart(id) {
                 var match = liveMenu.find(function(x){ return x.id === id; });
                 var inside = cart[id] ? cart[id].quantity : 0;
-                if(inside >= match.stock) { alert('Sorry, not enough stock available!'); return; }
+                if(inside >= match.stock) { alert('Sorry, not enough items left in stock!'); return; }
                 if(cart[id]) { cart[id].quantity++; } else { cart[id] = { id: match.id, name: match.name, price: match.price, quantity: 1 }; }
                 renderCart();
             }
@@ -136,7 +137,7 @@ function getTableHTML(tableNum) {
     </html>`;
 }
 
-// 2. Kitchen Dashboard View HTML String
+// 2. Kitchen Dashboard View & Live Stock Panel HTML
 const kitchenHTML = `
 <!DOCTYPE html>
 <html>
@@ -147,17 +148,26 @@ const kitchenHTML = `
     <style>
         body { font-family: sans-serif; background: #ecf0f1; padding: 20px; margin:0; }
         h1 { text-align: center; color: #2c3e50; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto 40px auto; }
         .box { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 4px solid #e67e22; }
         .box-hd { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; border-bottom: 1px dashed #ddd; padding-bottom: 5px; }
         .food-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.95rem; }
         .done-btn { width: 100%; background: #2ecc71; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        
+        .stock-panel { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 15px; }
+        .stock-card { border: 1px solid #ddd; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; background: #fafafa; }
     </style>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
     <h1>👨‍🍳 Live Kitchen Incoming Orders</h1>
     <div class="grid" id="orders-box"></div>
+
+    <div class="stock-panel">
+        <h2>📊 Remaining Stock Levels Monitoring</h2>
+        <div class="stock-grid" id="kitchen-stock-grid"></div>
+    </div>
 
     <script>
         var socket = io();
@@ -166,6 +176,19 @@ const kitchenHTML = `
         socket.on('kitchen_receive', function(data) {
             orders.push(data);
             drawOrders();
+        });
+
+        socket.on('update_stock', function(stockData) {
+            var container = document.getElementById('kitchen-stock-grid');
+            var html = '';
+            for(var i=0; i<stockData.length; i++) {
+                var item = stockData[i];
+                html += '<div class="stock-card">' +
+                    '<span>' + item.name + '</span>' +
+                    '<strong style="color:' + (item.stock <= 5 ? '#e74c3c' : '#27ae60') + '">' + item.stock + ' left</strong>' +
+                '</div>';
+            }
+            container.innerHTML = html;
         });
 
         function drawOrders() {
@@ -203,13 +226,12 @@ app.get('/Kitchen', (req, res) => res.send(kitchenHTML));
 app.get('/table:num.html', (req, res) => res.send(getTableHTML(req.params.num)));
 app.get('/table:num', (req, res) => res.send(getTableHTML(req.params.num)));
 
-// --- Real-time Socket.io Inventory Decoupler ---
+// --- Real-time Socket.io Inventory Management ---
 io.on('connection', (socket) => {
-    // Send latest stock whenever a table connects
     socket.emit('update_stock', menuItems);
 
     socket.on('new_order', (orderData) => {
-        // 📉 Deduct ordered stock levels instantly on the server
+        // Deduct stock safely on backend
         orderData.foods.forEach(ordered => {
             let match = menuItems.find(m => m.id === ordered.id);
             if (match) {
@@ -217,12 +239,11 @@ io.on('connection', (socket) => {
             }
         });
         
-        // Broadcast updates globally
-        io.emit('kitchen_receive', orderData); // Send to kitchen
-        io.emit('update_stock', menuItems);    // Broadcast new stock numbers to all tables
+        io.emit('kitchen_receive', orderData);
+        io.emit('update_stock', menuItems); // Sync updated inventory across all views
     });
 });
 
 server.listen(PORT, () => {
-    console.log(`🍲 Live Restaurant Server running on port: ${PORT}`);
+    console.log(`Live Restaurant Server running on port: ${PORT}`);
 });
