@@ -7,17 +7,26 @@
     <style>
         :root { --primary-color: #2c3e50; --accent-color: #e67e22; --bg-color: #ecf0f1; --card-bg: #ffffff; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; }
-        h1 { text-align: center; color: var(--primary-color); }
-        .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; color: var(--primary-color); margin-bottom: 30px; }
+        
+        /* Orders Grid */
+        .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto 40px auto; }
         .order-card { background: var(--card-bg); border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-top: 5px solid var(--accent-color); padding: 15px; display: flex; flex-direction: column; justify-content: space-between; }
         .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #eee; padding-bottom: 10px; margin-bottom: 10px; }
         .table-num { font-size: 1.4rem; font-weight: bold; color: #c0392b; }
         .food-list { list-style: none; padding: 0; margin: 0 0 15px 0; flex-grow: 1; }
         .food-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #f1f1f1; }
         .food-qty { font-weight: bold; color: #2e7d32; font-size: 1.1rem; }
-        .btn-complete { background-color: #2ecc71; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; }
+        .btn-complete { background-color: #2ecc71; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; transition: background 0.2s; }
         .btn-complete:hover { background-color: #27ae60; }
+
+        /* 📊 Stock Panels Section */
+        .stock-panel { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .stock-panel h2 { color: var(--primary-color); margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 15px; }
+        .stock-card { border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; font-weight: 500; }
     </style>
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
@@ -25,17 +34,48 @@
 
     <div class="orders-grid" id="orders-container"></div>
 
+    <div class="stock-panel">
+        <h2>📊 Remaining Stock Levels Monitoring (ระบบคุมสต๊อกวัตถุดิบ)</h2>
+        <div class="stock-grid" id="kitchen-stock-grid"></div>
+    </div>
+
     <script>
+        // Connect to local or Render back-end production server instance
+        var socket = io();
+        var localOrders = [];
+
+        // 📡 Listen for live incoming orders from customer tables
+        socket.on('kitchen_receive', function(order) {
+            localOrders.push(order);
+            renderOrders();
+        });
+
+        // 📡 Listen for global inventory level adjustments
+        socket.on('update_stock', function(stockData) {
+            var container = document.getElementById('kitchen-stock-grid');
+            var html = '';
+            for(var i = 0; i < stockData.length; i++) {
+                var item = stockData[i];
+                var criticalStock = item.stock <= 10;
+                var color = criticalStock ? '#e74c3c' : '#27ae60';
+                
+                html += '<div class="stock-card">' +
+                    '<span>' + item.name + '</span>' +
+                    '<strong style="color:' + color + '">' + (item.stock <= 0 ? 'หมด ❌' : item.stock + ' ที่') + '</strong>' +
+                '</div>';
+            }
+            container.innerHTML = html;
+        });
+
         function renderOrders() {
             const container = document.getElementById('orders-container');
-            const orders = JSON.parse(localStorage.getItem('hotpot_orders')) || [];
 
-            if (orders.length === 0) {
-                container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#7f8c8d;">📭 ไม่มีออเดอร์ค้างในระบบคราบ...</div>';
+            if (localOrders.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#7f8c8d; padding: 40px 0; font-size: 1.2rem;">📭 ไม่มีออเดอร์ค้างในระบบครับ...</div>';
                 return;
             }
 
-            container.innerHTML = orders.map(order => `
+            container.innerHTML = localOrders.map(order => `
                 <div class="order-card">
                     <div>
                         <div class="order-header">
@@ -57,17 +97,12 @@
         }
 
         function completeOrder(orderId) {
-            let orders = JSON.parse(localStorage.getItem('hotpot_orders')) || [];
-            orders = orders.filter(order => order.id !== orderId);
-            localStorage.setItem('hotpot_orders', JSON.stringify(orders));
+            // Remove the order cleanly from local visibility cache array
+            localOrders = localOrders.filter(order => order.id !== orderId);
             renderOrders();
         }
 
-        // Live native listening without network backend configuration needed
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'hotpot_orders') renderOrders();
-        });
-
+        // Initialize state view cleanly on build sequence
         renderOrders();
     </script>
 </body>
