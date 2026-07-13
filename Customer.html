@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ชาบู มียู - Mobile Menu</title>
+    <style>
+        :root {
+            --primary: #e74c3c;
+            --secondary: #c0392b;
+            --bg: #f8f9fa;
+            --card: #ffffff;
+            --text: #2c3e50;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            padding: 10px; 
+        }
+        h1 { 
+            color: var(--primary); 
+            font-size: 1.4rem; 
+            text-align: center; 
+            margin: 10px 0 15px; 
+        }
+        .container { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            max-width: 500px; 
+            margin: 0 auto; 
+        }
+        .menu-grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 8px; 
+        }
+        .menu-item { 
+            background: var(--card); 
+            border-radius: 6px; 
+            padding: 8px; 
+            text-align: center; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+            border: 1px solid #eee; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .item-name { font-size: 0.85rem; font-weight: bold; line-height: 1.2; margin-bottom: 4px; }
+        .item-price { color: var(--secondary); font-weight: bold; margin-bottom: 8px; font-size: 0.85rem; }
+        
+        .btn { background: var(--primary); color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 0.85rem; }
+        .btn:active { background: var(--secondary); }
+        
+        .cart-section { 
+            background: var(--card); 
+            padding: 12px; 
+            border-radius: 6px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); 
+        }
+        .cart-section h3 { margin: 0 0 10px 0; font-size: 1.1rem; }
+        .table-select-container { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
+        .table-select-container label { font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 4px; }
+        .table-dropdown { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9rem; }
+        
+        .cart-list { list-style: none; padding: 0; margin: 0 0 12px 0; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.85rem; }
+        .quantity-controls { display: flex; align-items: center; gap: 4px; }
+        
+        .btn-sm { padding: 4px 8px; font-size: 0.85rem; background: #e2e8f0; color: #333; border-radius: 3px; border: none; font-weight: bold; }
+        .btn-delete { background: #fee2e2; color: #ef4444; }
+        
+        .total-section { border-top: 1px solid #eee; padding-top: 8px; font-size: 0.95rem; font-weight: bold; margin-bottom: 12px; }
+        .total-row { display: flex; justify-content: space-between; margin-top: 4px; }
+        .table-display { font-size: 0.85rem; color: #7f8c8d; font-weight: normal; }
+        .btn-send { background: #2ecc71; font-size: 1rem; padding: 10px; }
+        .btn-send:active { background: #27ae60; }
+    </style>
+</head>
+<body>
+
+    <h1>♨️ เมนูชาบูบุฟเฟ่ต์</h1>
+
+    <div class="container">
+        <div class="menu-section">
+            <div class="menu-grid" id="menu-grid"></div>
+        </div>
+
+        <div class="cart-section">
+            <div class="table-select-container">
+                <label for="table-select">📍 เลือกหมายเลขโต๊ะ:</label>
+                <select id="table-select" class="table-dropdown" onchange="updateCartUI()">
+                    <option value="ยังไม่ได้เลือกโต๊ะ">-- กรุณาเลือกโต๊ะ --</option>
+                    <script>
+                        for(let i=1; i<=10; i++) {
+                            document.write(`<option value="โต๊ะ ${i}">โต๊ะ ${i} (Table ${i})</option>`);
+                        }
+                    </script>
+                </select>
+            </div>
+
+            <h3>รายการที่เลือก (Your Order)</h3>
+            <ul class="cart-list" id="cart-list"></ul>
+            
+            <div class="total-section">
+                <div class="total-row table-display">
+                    <span>หมายเลขโต๊ะ:</span>
+                    <span id="display-table" style="font-weight: bold; color: var(--primary);">ยังไม่ได้เลือกโต๊ะ</span>
+                </div>
+                <div class="total-row">
+                    <span>รวมทั้งหมด:</span>
+                    <span id="total-price">0 บาท</span>
+                </div>
+            </div>
+
+            <button class="btn btn-send" onclick="sendOrder()">ส่งรายการอาหาร 🚀</button>
+        </div>
+    </div>
+
+    <script>
+        const menuItems = [
+            { id: 1, name: "เนื้อวัวสไลด์ (Beef)", price: 89 },
+            { id: 2, name: "หมูสามชั้นสไลด์ (Pork Belly)", price: 69 },
+            { id: 3, name: "สันคอหมูสไลด์ (Pork Shoulder)", price: 69 },
+            { id: 4, name: "กุ้งสด (Shrimp)", price: 79 },
+            { id: 5, name: "ปลาหมึกสด (Squid)", price: 59 },
+            { id: 6, name: "ชุดผักรวม (Veggies)", price: 49 },
+            { id: 7, name: "ลูกชิ้นปลา (Fish Balls)", price: 39 },
+            { id: 8, name: "บะหมี่หยก (Noodles)", price: 20 }
+        ];
+
+        let cart = {};
+        
+        function displayMenu() {
+            document.getElementById('menu-grid').innerHTML = menuItems.map(item => `
+                <div class="menu-item">
+                    <div class="item-name">${item.name}</div>
+                    <div class="item-price">${item.price} บ.</div>
+                    <button class="btn" onclick="addToCart(${item.id})">เพิ่ม ➕</button>
+                </div>
+            `).join('');
+        }
+
+        function addToCart(id) {
+            if (cart[id]) { cart[id].quantity += 1; } 
+            else { cart[id] = { ...menuItems.find(p => p.id === id), quantity: 1 }; }
+            updateCartUI();
+        }
+
+        function changeQuantity(id, delta) {
+            if (!cart[id]) return;
+            cart[id].quantity += delta;
+            if (cart[id].quantity <= 0) delete cart[id];
+            updateCartUI();
+        }
+
+        function deleteItem(id) { delete cart[id]; updateCartUI(); }
+
+        function updateCartUI() {
+            const cartList = document.getElementById('cart-list');
+            const tableSelect = document.getElementById('table-select').value;
+            document.getElementById('display-table').innerText = tableSelect;
+            cartList.innerHTML = '';
+            let total = 0;
+
+            Object.values(cart).forEach(item => {
+                total += item.price * item.quantity;
+                const li = document.createElement('li');
+                li.className = 'cart-item';
+                li.innerHTML = `
+                    <div>
+                        <strong>${item.name}</strong><br>
+                        <small style="color: #7f8c8d;">${item.price} บ. x ${item.quantity}</small>
+                    </div>
+                    <div class="quantity-controls">
+                        <button class="btn btn-sm" onclick="changeQuantity(${item.id}, -1)">-</button>
+                        <span>${item.quantity}</span>
+                        <button class="btn btn-sm" onclick="changeQuantity(${item.id}, 1)">+</button>
+                        <button class="btn btn-sm btn-delete" onclick="deleteItem(${item.id})">🗑️</button>
+                    </div>
+                `;
+                cartList.appendChild(li);
+            });
+            document.getElementById('total-price').innerText = `${total} บาท`;
+        }
+
+        function sendOrder() {
+            const table = document.getElementById('table-select').value;
+            const items = Object.values(cart);
+
+            if (table === "ยังไม่ได้เลือกโต๊ะ" || items.length === 0) {
+                alert("กรุณาเลือกโต๊ะและเลือกรายการอาหารก่อนส่งครับ!");
+                return;
+            }
+
+            const newOrder = {
+                id: Date.now(),
+                table: table,
+                foods: items,
+                time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+            };
+
+            let existingOrders = JSON.parse(localStorage.getItem('hotpot_orders')) || [];
+            existingOrders.push(newOrder);
+            localStorage.setItem('hotpot_orders', JSON.stringify(existingOrders));
+
+            alert("ส่งออเดอร์เข้าครัวเรียบร้อย! 🎉");
+            cart = {};
+            updateCartUI();
+        }
+
+        displayMenu();
+        updateCartUI();
+    </script>
+</body>
+</html>

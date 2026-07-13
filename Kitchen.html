@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบรับออเดอร์ห้องครัว (Kitchen Dashboard)</title>
+    <style>
+        :root { --primary-color: #2c3e50; --accent-color: #e67e22; --bg-color: #ecf0f1; --card-bg: #ffffff; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; }
+        h1 { text-align: center; color: var(--primary-color); }
+        .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .order-card { background: var(--card-bg); border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-top: 5px solid var(--accent-color); padding: 15px; display: flex; flex-direction: column; justify-content: space-between; }
+        .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #eee; padding-bottom: 10px; margin-bottom: 10px; }
+        .table-num { font-size: 1.4rem; font-weight: bold; color: #c0392b; }
+        .food-list { list-style: none; padding: 0; margin: 0 0 15px 0; flex-grow: 1; }
+        .food-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #f1f1f1; }
+        .food-qty { font-weight: bold; color: #2e7d32; font-size: 1.1rem; }
+        .btn-complete { background-color: #2ecc71; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; }
+        .btn-complete:hover { background-color: #27ae60; }
+    </style>
+</head>
+<body>
+
+    <h1>👨‍🍳 รายการส่งอาหารเข้าครัว (Live Tracker)</h1>
+
+    <div class="orders-grid" id="orders-container"></div>
+
+    <script>
+        function renderOrders() {
+            const container = document.getElementById('orders-container');
+            const orders = JSON.parse(localStorage.getItem('hotpot_orders')) || [];
+
+            if (orders.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#7f8c8d;">📭 ไม่มีออเดอร์ค้างในระบบคราบ...</div>';
+                return;
+            }
+
+            container.innerHTML = orders.map(order => `
+                <div class="order-card">
+                    <div>
+                        <div class="order-header">
+                            <span class="table-num">📍 ${order.table}</span>
+                            <span style="color: #7f8c8d;">🕒 ${order.time}</span>
+                        </div>
+                        <ul class="food-list">
+                            ${order.foods.map(food => `
+                                <li class="food-item">
+                                    <span>${food.name}</span>
+                                    <span class="food-qty">x ${food.quantity}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                    <button class="btn-complete" onclick="completeOrder(${order.id})">เสิร์ฟแล้ว / เคลียร์ออเดอร์ ✅</button>
+                </div>
+            `).join('');
+        }
+
+        function completeOrder(orderId) {
+            let orders = JSON.parse(localStorage.getItem('hotpot_orders')) || [];
+            orders = orders.filter(order => order.id !== orderId);
+            localStorage.setItem('hotpot_orders', JSON.stringify(orders));
+            renderOrders();
+        }
+
+        // Live native listening without network backend configuration needed
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'hotpot_orders') renderOrders();
+        });
+
+        renderOrders();
+    </script>
+</body>
+</html>
