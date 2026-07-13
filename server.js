@@ -13,25 +13,25 @@ app.use(express.json());
 
 // 📦 Global Stock and Menu Configuration (Starts at 75 each)
 let menuItems = [
-    { id: 1, name: "Beef Slices", price: 89, stock: 75 },
-    { id: 2, name: "Pork Belly Slices", price: 69, stock: 75 },
-    { id: 3, name: "Pork Shoulder Slices", price: 69, stock: 75 },
-    { id: 4, name: "Fresh Shrimp", price: 79, stock: 75 },
-    { id: 5, name: "Fresh Squid", price: 59, stock: 75 },
-    { id: 6, name: "Mixed Veggies Set", price: 49, stock: 75 },
-    { id: 7, name: "Fish Balls", price: 39, stock: 75 },
-    { id: 8, name: "Green Noodles", price: 20, stock: 75 }
+    { id: 1, name: "เนื้อวัวสไลด์ (Beef)", price: 89, stock: 75 },
+    { id: 2, name: "หมูสามชั้นสไลด์ (Pork Belly)", price: 69, stock: 75 },
+    { id: 3, name: "สันคอหมูสไลด์ (Pork Shoulder)", price: 69, stock: 75 },
+    { id: 4, name: "กุ้งสด (Shrimp)", price: 79, stock: 75 },
+    { id: 5, name: "ปลาหมึกสด (Squid)", price: 59, stock: 75 },
+    { id: 6, name: "ชุดผักรวม (Veggies)", price: 49, stock: 75 },
+    { id: 7, name: "ลูกชิ้นปลา (Fish Balls)", price: 39, stock: 75 },
+    { id: 8, name: "บะหมี่หยก (Noodles)", price: 20, stock: 75 }
 ];
 
-// 1. Dynamic Customer Ordering Page HTML Generator
+// 1. Customer Ordering UI Template Generator
 function getTableHTML(tableNum) {
     return `
     <!DOCTYPE html>
-    <html>
+    <html lang="th">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Shabu Me You - Table ${tableNum}</title>
+        <title>เมนูชาบูบุฟเฟต์ - โต๊ะ ${tableNum}</title>
         <style>
             body { font-family: sans-serif; background: #f8f9fa; color: #2c3e50; margin: 0; padding: 10px; }
             h1 { color: #e74c3c; text-align: center; }
@@ -49,22 +49,22 @@ function getTableHTML(tableNum) {
         <script src="/socket.io/socket.io.js"></script>
     </head>
     <body>
-        <h1>♨️ Shabu Buffet Menu</h1>
-        <div class="banner">You are ordering for: Table ${tableNum}</div>
+        <h1>♨️ เมนูชาบูบุฟเฟต์</h1>
+        <div class="banner">คุณกำลังสั่งอาหารสำหรับ: โต๊ะ ${tableNum}</div>
         <div class="grid" id="menu-grid"></div>
         
         <div class="cart">
-            <h3>🛒 Your Order</h3>
+            <h3>🛒 รายการที่เลือก (Your Order)</h3>
             <div id="cart-list"></div>
             <hr>
-            <p><strong>Location:</strong> Table ${tableNum}</p>
-            <p><strong>Total Price:</strong> <span id="total-price">0</span> THB</p>
-            <button class="btn-send" onclick="sendOrder()">Send Order to Kitchen 🚀</button>
+            <p><strong>หมายเลขโต๊ะ:</strong> โต๊ะ ${tableNum}</p>
+            <p><strong>รวมทั้งหมด:</strong> <span id="total-price">0</span> บาท</p>
+            <button class="btn-send" onclick="sendOrder()">ส่งรายการอาหาร 🚀</button>
         </div>
 
         <script>
             var socket = io();
-            var tableSign = "Table " + ${tableNum};
+            var tableSign = "โต๊ะ " + ${tableNum};
             var liveMenu = [];
             var cart = {};
 
@@ -81,9 +81,9 @@ function getTableHTML(tableNum) {
                     var isOut = item.stock <= 0;
                     html += '<div class="card">' +
                         '<div><strong>' + item.name + '</strong></div>' +
-                        '<div style="color:#c0392b;margin:4px 0;">' + item.price + ' THB</div>' +
-                        '<div class="stock-lbl ' + (isOut ? 'out' : '') + '">' + (isOut ? '❌ Out of Stock' : 'Stock: ' + item.stock + ' left') + '</div>' +
-                        '<button class="btn" onclick="addToCart(' + item.id + ')" ' + (isOut ? 'disabled' : '') + '>' + (isOut ? 'Sold Out' : 'Add ➕') + '</button>' +
+                        '<div style="color:#c0392b;margin:4px 0;">' + item.price + ' บ.</div>' +
+                        '<div class="stock-lbl ' + (isOut ? 'out' : '') + '">' + (isOut ? '❌ หมด' : 'เหลือ: ' + item.stock + ' ที่') + '</div>' +
+                        '<button class="btn" onclick="addToCart(' + item.id + ')" ' + (isOut ? 'disabled' : '') + '>' + (isOut ? 'หมด' : 'เพิ่ม ➕') + '</button>' +
                     '</div>';
                 }
                 container.innerHTML = html;
@@ -93,7 +93,7 @@ function getTableHTML(tableNum) {
             function addToCart(id) {
                 var match = liveMenu.find(function(x){ return x.id === id; });
                 var inside = cart[id] ? cart[id].quantity : 0;
-                if(inside >= match.stock) { alert('Sorry, not enough items left in stock!'); return; }
+                if(inside >= match.stock) { alert('ขออภัย วัตถุดิบมีไม่พอ!'); return; }
                 if(cart[id]) { cart[id].quantity++; } else { cart[id] = { id: match.id, name: match.name, price: match.price, quantity: 1 }; }
                 renderCart();
             }
@@ -108,10 +108,10 @@ function getTableHTML(tableNum) {
                     total += item.price * item.quantity;
                     html += '<div class="cart-item">' +
                         '<span>' + item.name + ' (x' + item.quantity + ')</span>' +
-                        '<span>' + (item.price * item.quantity) + ' THB</span>' +
+                        '<span>' + (item.price * item.quantity) + ' บาท</span>' +
                     '</div>';
                 }
-                container.innerHTML = html || '<p style="color:#aaa;">No items selected yet.</p>';
+                container.innerHTML = html || '<p style="color:#aaa;">ยังไม่ได้เลือกรายการอาหาร</p>';
                 document.getElementById('total-price').innerText = total;
             }
 
@@ -119,16 +119,16 @@ function getTableHTML(tableNum) {
                 var foodArray = [];
                 var keys = Object.keys(cart);
                 for(var i=0; i<keys.length; i++) { foodArray.push(cart[keys[i]]); }
-                if(foodArray.length === 0) { alert('Please pick items before checking out.'); return; }
+                if(foodArray.length === 0) { alert('กรุณาเลือกอาหารก่อนส่งครับ'); return; }
                 
                 var payload = {
                     id: Date.now(),
                     table: tableSign,
                     foods: foodArray,
-                    time: new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})
+                    time: new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})
                 };
                 socket.emit('new_order', payload);
-                alert('Order successfully sent to kitchen! 🎉');
+                alert('ส่งออเดอร์เข้าครัวเรียบร้อยแล้วครับ! 🎉');
                 cart = {};
                 renderCart();
             }
@@ -137,95 +137,119 @@ function getTableHTML(tableNum) {
     </html>`;
 }
 
-// 2. Kitchen Dashboard View & Live Stock Panel HTML
+// 2. Kitchen UI Dashboard String Template
 const kitchenHTML = `
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kitchen Tracker</title>
+    <title>ระบบรับออเดอร์ห้องครัว (Kitchen Dashboard)</title>
     <style>
-        body { font-family: sans-serif; background: #ecf0f1; padding: 20px; margin:0; }
-        h1 { text-align: center; color: #2c3e50; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto 40px auto; }
-        .box { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 4px solid #e67e22; }
-        .box-hd { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; border-bottom: 1px dashed #ddd; padding-bottom: 5px; }
-        .food-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.95rem; }
-        .done-btn { width: 100%; background: #2ecc71; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        :root { --primary-color: #2c3e50; --accent-color: #e67e22; --bg-color: #ecf0f1; --card-bg: #ffffff; }
+        body { font-family: sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; }
+        h1 { text-align: center; color: var(--primary-color); }
+        .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto 40px auto; }
+        .order-card { background: var(--card-bg); border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-top: 5px solid var(--accent-color); padding: 15px; display: flex; flex-direction: column; justify-content: space-between; }
+        .order-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #eee; padding-bottom: 10px; margin-bottom: 10px; }
+        .table-num { font-size: 1.4rem; font-weight: bold; color: #c0392b; }
+        .food-list { list-style: none; padding: 0; margin: 0 0 15px 0; flex-grow: 1; }
+        .food-item { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #f1f1f1; }
+        .food-qty { font-weight: bold; color: #2e7d32; font-size: 1.1rem; }
+        .btn-complete { background-color: #2ecc71; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; }
+        .btn-complete:hover { background-color: #27ae60; }
         
-        .stock-panel { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 15px; }
-        .stock-card { border: 1px solid #ddd; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; background: #fafafa; }
+        .stock-panel { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 15px; }
+        .stock-card { border: 1px solid #e2e8f0; padding: 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
     </style>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-    <h1>👨‍🍳 Live Kitchen Incoming Orders</h1>
-    <div class="grid" id="orders-box"></div>
+    <h1>👨‍🍳 รายการส่งอาหารเข้าครัว (Live Tracker)</h1>
+    <div class="orders-grid" id="orders-container"></div>
 
     <div class="stock-panel">
-        <h2>📊 Remaining Stock Levels Monitoring</h2>
+        <h2>📊 Remaining Stock Levels Monitoring (ระบบคุมสต๊อกวัตถุดิบ)</h2>
         <div class="stock-grid" id="kitchen-stock-grid"></div>
     </div>
 
     <script>
         var socket = io();
-        var orders = [];
+        var localOrders = [];
 
-        socket.on('kitchen_receive', function(data) {
-            orders.push(data);
-            drawOrders();
+        socket.on('kitchen_receive', function(order) {
+            localOrders.push(order);
+            renderOrders();
         });
 
         socket.on('update_stock', function(stockData) {
             var container = document.getElementById('kitchen-stock-grid');
             var html = '';
-            for(var i=0; i<stockData.length; i++) {
+            for(var i = 0; i < stockData.length; i++) {
                 var item = stockData[i];
+                var critical = item.stock <= 10;
                 html += '<div class="stock-card">' +
                     '<span>' + item.name + '</span>' +
-                    '<strong style="color:' + (item.stock <= 5 ? '#e74c3c' : '#27ae60') + '">' + item.stock + ' left</strong>' +
+                    '<strong style="color:' + (critical ? '#e74c3c' : '#27ae60') + '">' + (item.stock <= 0 ? 'หมด ❌' : item.stock + ' ที่') + '</strong>' +
                 '</div>';
             }
             container.innerHTML = html;
         });
 
-        function drawOrders() {
-            var container = document.getElementById('orders-box');
-            if(orders.length === 0) { container.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#95a5a6;">No active pending orders.</p>'; return; }
-            var html = '';
-            for(var i=0; i<orders.length; i++) {
-                var order = orders[i];
-                var fHtml = '';
-                for(var j=0; j<order.foods.length; j++) {
-                    fHtml += '<div class="food-row"><span>' + order.foods[j].name + '</span><strong>x' + order.foods[j].quantity + '</strong></div>';
-                }
-                html += '<div class="box">' +
-                    '<div class="box-hd"><span style="color:#e67e22;">📍 ' + order.table + '</span><span style="font-size:0.8rem;color:#95a5a6;">🕒 ' + order.time + '</span></div>' +
-                    '<div>' + fHtml + '</div>' +
-                    '<button class="done-btn" onclick="clearBox(' + order.id + ')">Served ✅</button>' +
-                '</div>';
+        function renderOrders() {
+            const container = document.getElementById('orders-container');
+            if (localOrders.length === 0) {
+                container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#7f8c8d; padding:20px;">📭 ไม่มีออเดอร์ค้างในระบบครับ...</div>';
+                return;
             }
-            container.innerHTML = html;
+            container.innerHTML = localOrders.map(order => \`
+                <div class="order-card">
+                    <div>
+                        <div class="order-header">
+                            <span class="table-num">📍 \${order.table}</span>
+                            <span style="color: #7f8c8d;">🕒 \${order.time}</span>
+                        </div>
+                        <ul class="food-list">
+                            \${order.foods.map(food => \`
+                                <li class="food-item">
+                                    <span>\${food.name}</span>
+                                    <span class="food-qty">x \${food.quantity}</span>
+                                </li>
+                            \`).join('')}
+                        </ul>
+                    </div>
+                    <button class="btn-complete" onclick="completeOrder(\${order.id})">เสิร์ฟแล้ว / เคลียร์ออเดอร์ ✅</button>
+                </div>
+            \`).join('');
         }
 
-        function clearBox(id) {
-            orders = orders.filter(function(x){ return x.id !== id; });
-            drawOrders();
+        function completeOrder(orderId) {
+            localOrders = localOrders.filter(order => order.id !== orderId);
+            renderOrders();
         }
-        drawOrders();
+        renderOrders();
     </script>
 </body>
 </html>`;
 
-// --- Express Routing Engine (Compatible with Express v5 path syntax) ---
+// --- 🛠️ 3. Express Routing (Catches all your screenshot paths) ---
 app.get('/', (req, res) => res.send(getTableHTML(1)));
-app.get('/Kitchen.html', (req, res) => res.send(kitchenHTML));
-app.get('/Kitchen', (req, res) => res.send(kitchenHTML));
 app.get('/table/:num', (req, res) => res.send(getTableHTML(req.params.num)));
 
-// --- Real-time Socket.io Inventory Management ---
+// Kitchen Dashboard Endpoints (Handles with or without .html, uppercase/lowercase)
+app.get('/kitchen', (req, res) => res.send(kitchenHTML));
+app.get('/Kitchen', (req, res) => res.send(kitchenHTML));
+app.get('/kitchen.html', (req, res) => res.send(kitchenHTML));
+app.get('/Kitchen.html', (req, res) => res.send(kitchenHTML));
+
+// Stock Monitoring Redirects (Sends them to the integrated kitchen view dashboard)
+app.get('/stock', (req, res) => res.send(kitchenHTML));
+app.get('/Stock', (req, res) => res.send(kitchenHTML));
+app.get('/stock.html', (req, res) => res.send(kitchenHTML));
+app.get('/Stock.html', (req, res) => res.send(kitchenHTML));
+
+// --- 4. Real-time Socket Inventory Connection ---
 io.on('connection', (socket) => {
     socket.emit('update_stock', menuItems);
 
@@ -236,12 +260,11 @@ io.on('connection', (socket) => {
                 match.stock = Math.max(0, match.stock - ordered.quantity);
             }
         });
-        
         io.emit('kitchen_receive', orderData);
         io.emit('update_stock', menuItems); 
     });
 });
 
 server.listen(PORT, () => {
-    console.log(`Live Restaurant Server running on port: ${PORT}`);
+    console.log(`Live Server active on port ${PORT}`);
 });
