@@ -23,6 +23,27 @@ let menuItems = [
     { id: 8, name: "บะหมี่หยก (Noodles)", price: 20, stock: 75 }
 ];
 
+// ⏰ --- AUTO-RESTOCK ENGINE (Every 7 Seconds) ---
+// This background process checks if any item is below its max limit and increments it safely.
+setInterval(() => {
+    let stockChanged = false;
+
+    menuItems.forEach(item => {
+        if (item.stock < 75) {
+            item.stock += 5; // Adds 5 items back to stock
+            if (item.stock > 75) item.stock = 75; // Caps it perfectly at 75 max
+            stockChanged = true;
+        }
+    });
+
+    // If any items were updated, broadcast the new stock levels to all screens instantly
+    if (stockChanged) {
+        io.emit('update_stock', menuItems);
+        console.log(`[Auto-Restock] Inventory topped up at ${new Date().toLocaleTimeString()}`);
+    }
+}, 7000); // 7000 milliseconds = 7 seconds
+
+
 // 1. Customer Ordering UI Template Generator
 function getTableHTML(tableNum) {
     return `
@@ -233,26 +254,96 @@ const kitchenHTML = `
 </body>
 </html>`;
 
-// --- 🛠️ 3. Express Routing (Catches all your screenshot paths) ---
+// 3. Manager UI Template (Allows Manual Controls + Displays Automated Counter Status)
+const managerHTML = `
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบผู้จัดการร้าน (Manager Control Panel)</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f5f6fa; margin: 0; padding: 25px; }
+        h1 { color: #2c3e50; text-align: center; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .status-alert { background: #e8f8f5; border-left: 5px solid #2ecc71; padding: 12px; margin-bottom: 20px; font-weight: bold; color: #117a65; }
+        .item-list { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .item-list th, .item-list td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        .item-list th { background-color: #34495e; color: white; }
+        .btn-restock { background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-restock:hover { background: #2980b9; }
+        .btn-all { background: #e67e22; font-size: 1.1rem; padding: 12px; border: none; border-radius: 5px; color: white; font-weight: bold; width: 100%; margin-top: 20px; cursor: pointer; }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>⚙️ แผงควบคุมผู้จัดการร้าน (Manager Panel)</h1>
+        <div class="status-alert">🔄 ระบบเปิดใช้งานเติมสต๊อกอัตโนมัติ (+5 ชิ้น ทุกๆ 7 วินาที)</div>
+        
+        <button class="btn-all" onclick="restockAll()">⚡ รีเซ็ต / เติมเต็มสต๊อกทุกเมนู (Set to 75)</button>
+        
+        <table class="item-list">
+            <thead>
+                <tr>
+                    <th>ชื่ออาหาร</th>
+                    <th>สถานะสต๊อกปัจจุบัน</th>
+                    <th>คำสั่งจัดการ</th>
+                </tr>
+            </thead>
+            <tbody id="manager-table-body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        var socket = io();
+
+        socket.on('update_stock', function(stockData) {
+            var tbody = document.getElementById('manager-table-body');
+            var html = '';
+            for(var i=0; i<stockData.length; i++) {
+                var item = stockData[i];
+                html += '<tr>' +
+                    '<td><strong>' + item.name + '</strong></td>' +
+                    '<td><span style="font-weight:bold; color:' + (item.stock <= 10 ? '#e74c3c' : '#27ae60') + '">' + item.stock + ' / 75 ที่</span></td>' +
+                    '<td><button class="btn-restock" onclick="manualRestock(' + item.id + ')">+10 ชิ้น</button></td>' +
+                '</tr>';
+            }
+            tbody.innerHTML = html;
+        });
+
+        function manualRestock(itemId) {
+            socket.emit('manager_restock_single', itemId);
+        }
+
+        function restockAll() {
+            socket.emit('manager_restock_all');
+        }
+    </script>
+</body>
+</html>`;
+
+
+// --- 🛠️ 4. Express Routing Setup ---
 app.get('/', (req, res) => res.send(getTableHTML(1)));
 app.get('/table/:num', (req, res) => res.send(getTableHTML(req.params.num)));
 
-// Kitchen Dashboard Endpoints (Handles with or without .html, uppercase/lowercase)
+// Kitchen Dashboard Aliases
 app.get('/kitchen', (req, res) => res.send(kitchenHTML));
 app.get('/Kitchen', (req, res) => res.send(kitchenHTML));
 app.get('/kitchen.html', (req, res) => res.send(kitchenHTML));
 app.get('/Kitchen.html', (req, res) => res.send(kitchenHTML));
 
-// Stock Monitoring Redirects (Sends them to the integrated kitchen view dashboard)
-app.get('/stock', (req, res) => res.send(kitchenHTML));
-app.get('/Stock', (req, res) => res.send(kitchenHTML));
-app.get('/stock.html', (req, res) => res.send(kitchenHTML));
-app.get('/Stock.html', (req, res) => res.send(kitchenHTML));
+// Manager Dashboard Aliases
+app.get('/manager', (req, res) => res.send(managerHTML));
+app.get('/Manager', (req, res) => res.send(managerHTML));
+app.get('/manager.html', (req, res) => res.send(managerHTML));
 
-// --- 4. Real-time Socket Inventory Connection ---
+// --- 5. Real-time Socket Inventory Connection ---
 io.on('connection', (socket) => {
     socket.emit('update_stock', menuItems);
 
+    // Customer places order
     socket.on('new_order', (orderData) => {
         orderData.foods.forEach(ordered => {
             let match = menuItems.find(m => m.id === ordered.id);
@@ -262,6 +353,21 @@ io.on('connection', (socket) => {
         });
         io.emit('kitchen_receive', orderData);
         io.emit('update_stock', menuItems); 
+    });
+
+    // Manager manual single item restock (+10)
+    socket.on('manager_restock_single', (itemId) => {
+        let match = menuItems.find(m => m.id === itemId);
+        if (match) {
+            match.stock = Math.min(75, match.stock + 10);
+            io.emit('update_stock', menuItems);
+        }
+    });
+
+    // Manager manual reset all items to full capacity
+    socket.on('manager_restock_all', () => {
+        menuItems.forEach(item => item.stock = 75);
+        io.emit('update_stock', menuItems);
     });
 });
 
