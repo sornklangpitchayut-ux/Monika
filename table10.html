@@ -60,10 +60,13 @@
             justify-content: space-between;
         }
         .item-name { font-size: 0.85rem; font-weight: bold; line-height: 1.2; margin-bottom: 4px; }
-        .item-price { color: var(--secondary); font-weight: bold; margin-bottom: 8px; font-size: 0.85rem; }
+        .item-price { color: var(--secondary); font-weight: bold; margin-bottom: 4px; font-size: 0.85rem; }
+        .stock-lbl { font-size: 0.75rem; color: #27ae60; font-weight: bold; margin-bottom: 6px; }
+        .stock-lbl.out { color: #7f8c8d; }
         
         .btn { background: var(--primary); color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 0.85rem; }
-        .btn:active { background: var(--secondary); }
+        .btn:disabled { background: #bdc3c7; cursor: not-allowed; }
+        .btn:active:not(:disabled) { background: var(--secondary); }
         
         .cart-section { 
             background: var(--card); 
@@ -77,15 +80,16 @@
         .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.85rem; }
         .quantity-controls { display: flex; align-items: center; gap: 4px; }
         
-        .btn-sm { padding: 4px 8px; font-size: 0.85rem; background: #e2e8f0; color: #333; border-radius: 3px; border: none; font-weight: bold; }
+        .btn-sm { padding: 4px 8px; font-size: 0.85rem; background: #e2e8f0; color: #333; border-radius: 3px; border: none; font-weight: bold; cursor: pointer; }
         .btn-delete { background: #fee2e2; color: #ef4444; }
         
         .total-section { border-top: 1px solid #eee; padding-top: 8px; font-size: 0.95rem; font-weight: bold; margin-bottom: 12px; }
         .total-row { display: flex; justify-content: space-between; margin-top: 4px; }
         .table-display { font-size: 0.85rem; color: #7f8c8d; font-weight: normal; }
         .btn-send { background: #2ecc71; font-size: 1rem; padding: 10px; }
-        .btn-send:active { background: #27ae60; }
+        .btn-send:active:not(:disabled) { background: #27ae60; }
     </style>
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
@@ -117,20 +121,17 @@
     </div>
 
     <script>
-        // เปลี่ยนชื่อโต๊ะที่นี่เมื่อต้องการสร้างไฟล์สำหรับโต๊ะอื่น ๆ เช่น "โต๊ะ 2", "โต๊ะ 3"
-        const CURRENT_TABLE = "โต๊ะ 1";
+        var socket = io();
+        
+        // This parses your clean path route variable structure dynamically: e.g., /table/3 -> โต๊ะ 3
+        // Defaulting backup structure safely to table 1 if parsed as home route endpoint "/"
+        var rawPath = window.location.pathname.split('/');
+        var tableNum = rawPath[rawPath.length - 1] || "1";
+        if(isNaN(tableNum)) { tableNum = "1"; } 
+        
+        const CURRENT_TABLE = "โต๊ะ " + tableNum;
 
-        const menuItems = [
-            { id: 1, name: "เนื้อวัวสไลด์ (Beef)", price: 89 },
-            { id: 2, name: "หมูสามชั้นสไลด์ (Pork Belly)", price: 69 },
-            { id: 3, name: "สันคอหมูสไลด์ (Pork Shoulder)", price: 69 },
-            { id: 4, name: "กุ้งสด (Shrimp)", price: 79 },
-            { id: 5, name: "ปลาหมึกสด (Squid)", price: 59 },
-            { id: 6, name: "ชุดผักรวม (Veggies)", price: 49 },
-            { id: 7, name: "ลูกชิ้นปลา (Fish Balls)", price: 39 },
-            { id: 8, name: "บะหมี่หยก (Noodles)", price: 20 }
-        ];
-
+        let liveMenu = [];
         let cart = {};
         
         function initTableDisplay() {
@@ -139,37 +140,76 @@
             document.getElementById('display-table').innerText = CURRENT_TABLE;
         }
 
+        // Receive up-to-the-second inventory balances from manager loops or other orders
+        socket.on('update_stock', function(data) {
+            liveMenu = data;
+            displayMenu();
+            updateCartUI(); // Updates current bounds if manager manually refilled items
+        });
+
         function displayMenu() {
-            document.getElementById('menu-grid').innerHTML = menuItems.map(item => `
-                <div class="menu-item">
-                    <div class="item-name">${item.name}</div>
-                    <div class="item-price">${item.price} บ.</div>
-                    <button class="btn" onclick="addToCart(${item.id})">เพิ่ม ➕</button>
-                </div>
-            `).join('');
+            document.getElementById('menu-grid').innerHTML = liveMenu.map(item => {
+                var isOut = item.stock <= 0;
+                return `
+                    <div class="menu-item">
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-price">${item.price} บ.</div>
+                        <div class="stock-lbl ${isOut ? 'out' : ''}">${isOut ? '❌ หมด' : 'เหลือ: ' + item.stock + ' ที่'}</div>
+                        <button class="btn" onclick="addToCart(${item.id})" ${isOut ? 'disabled' : ''}>
+                            ${isOut ? 'หมด' : 'เพิ่ม ➕'}
+                        </button>
+                    </div>
+                `;
+            }).join('');
         }
 
         function addToCart(id) {
-            if (cart[id]) { cart[id].quantity += 1; } 
-            else { cart[id] = { ...menuItems.find(p => p.id === id), quantity: 1 }; }
+            var match = liveMenu.find(p => p.id === id);
+            var currentInCart = cart[id] ? cart[id].quantity : 0;
+            
+            if (currentInCart >= match.stock) { 
+                alert("ขออภัย วัตถุดิบในร้านมีไม่พอสำหรับการเพิ่มรายการนี้ครับ!"); 
+                return; 
+            }
+
+            if (cart[id]) { 
+                cart[id].quantity += 1; 
+            } else { 
+                cart[id] = { id: match.id, name: match.name, price: match.price, quantity: 1 }; 
+            }
             updateCartUI();
         }
 
         function changeQuantity(id, delta) {
             if (!cart[id]) return;
+            var match = liveMenu.find(p => p.id === id);
+            
+            if (delta > 0 && cart[id].quantity >= match.stock) {
+                alert("ขออภัย วัตถุดิบในสต๊อกมีจำกัด ไม่สามารถเพิ่มได้มากกว่านี้ครับ!");
+                return;
+            }
+
             cart[id].quantity += delta;
             if (cart[id].quantity <= 0) delete cart[id];
             updateCartUI();
         }
 
-        function deleteItem(id) { delete cart[id]; updateCartUI(); }
+        function deleteItem(id) { 
+            delete cart[id]; 
+            updateCartUI(); 
+        }
 
         function updateCartUI() {
             const cartList = document.getElementById('cart-list');
             cartList.innerHTML = '';
             let total = 0;
 
-            Object.values(cart).forEach(item => {
+            var items = Object.values(cart);
+            if(items.length === 0) {
+                cartList.innerHTML = '<p style="color:#aaa; text-align:center; margin:10px 0; font-size:0.85rem;">ยังไม่ได้เลือกรายการอาหาร</p>';
+            }
+
+            items.forEach(item => {
                 total += item.price * item.quantity;
                 const li = document.createElement('li');
                 li.className = 'cart-item';
@@ -205,9 +245,8 @@
                 time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
             };
 
-            let existingOrders = JSON.parse(localStorage.getItem('hotpot_orders')) || [];
-            existingOrders.push(newOrder);
-            localStorage.setItem('hotpot_orders', JSON.stringify(existingOrders));
+            // Emit safely to the websocket network instead of basic localStorage
+            socket.emit('new_order', newOrder);
 
             alert(`ส่งออเดอร์ของ ${CURRENT_TABLE} เข้าครัวเรียบร้อย! 🎉`);
             cart = {};
@@ -215,8 +254,6 @@
         }
 
         initTableDisplay();
-        displayMenu();
-        updateCartUI();
     </script>
 </body>
 </html>
