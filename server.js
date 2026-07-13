@@ -42,7 +42,7 @@ setInterval(() => {
 }, 7000);
 
 
-// 1. Customer Ordering UI Template Generator (Upgraded with Cart Adjustments)
+// 1. Customer Ordering UI Template Generator
 function getTableHTML(tableNum) {
     return `
     <!DOCTYPE html>
@@ -192,7 +192,7 @@ function getTableHTML(tableNum) {
     </html>`;
 }
 
-// 2. Kitchen UI Dashboard String Template
+// 2. Kitchen UI Dashboard String Template (Using standard JavaScript array loop to fix the crashing bug)
 const kitchenHTML = `
 <!DOCTYPE html>
 <html lang="th">
@@ -253,34 +253,41 @@ const kitchenHTML = `
         });
 
         function renderOrders() {
-            const container = document.getElementById('orders-container');
+            var container = document.getElementById('orders-container');
             if (localOrders.length === 0) {
                 container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color:#7f8c8d; padding:20px;">📭 ไม่มีออเดอร์ค้างในระบบครับ...</div>';
                 return;
             }
-            container.innerHTML = localOrders.map(order => `
-                <div class="order-card">
-                    <div>
-                        <div class="order-header">
-                            <span class="table-num">📍 \${order.table}</span>
-                            <span style="color: #7f8c8d;">🕒 \${order.time}</span>
-                        </div>
-                        <ul class="food-list">
-                            \${order.foods.map(food => `
-                                <li class="food-item">
-                                    <span>\${food.name}</span>
-                                    <span class="food-qty">x \${food.quantity}</span>
-                                </li>
-                            `).join('')}
-                        </ul>
-                    </div>
-                    <button class="btn-complete" onclick="completeOrder(\${order.id})">เสิร์ฟแล้ว / เคลียร์ออเดอร์ ✅</button>
-                </div>
-            `).join('');
+            
+            var html = '';
+            for (var i = 0; i < localOrders.length; i++) {
+                var order = localOrders[i];
+                
+                var foodsHtml = '';
+                for (var j = 0; j < order.foods.length; j++) {
+                    var food = order.foods[j];
+                    foodsHtml += '<li class="food-item">' +
+                                    '<span>' + food.name + '</span>' +
+                                    '<span class="food-qty">x ' + food.quantity + '</span>' +
+                                 '</li>';
+                }
+
+                html += '<div class="order-card">' +
+                    '<div>' +
+                        '<div class="order-header">' +
+                            '<span class="table-num">📍 ' + order.table + '</span>' +
+                            '<span style="color: #7f8c8d;">🕒 ' + order.time + '</span>' +
+                        '</div>' +
+                        '<ul class="food-list">' + foodsHtml + '</ul>' +
+                    '</div>' +
+                    '<button class="btn-complete" onclick="completeOrder(' + order.id + ')">เสิร์ฟแล้ว / เคลียร์ออเดอร์ ✅</button>' +
+                '</div>';
+            }
+            container.innerHTML = html;
         }
 
         function completeOrder(orderId) {
-            localOrders = localOrders.filter(order => order.id !== orderId);
+            localOrders = localOrders.filter(function(order) { return order.id !== orderId; });
             renderOrders();
         }
         renderOrders();
@@ -358,20 +365,11 @@ const managerHTML = `
 </html>`;
 
 
-// --- 🛠️ 4. Express Routing Setup (Updated for multiple entry variants) ---
-
-// Catch default root route
+// --- 🛠️ 4. Express Routing Setup ---
 app.get('/', (req, res) => res.send(getTableHTML(1)));
-
-// Pattern A: Matches standard clean routes -> /table/2
 app.get('/table/:num', (req, res) => res.send(getTableHTML(req.params.num)));
-
-// Pattern B: Matches explicit suffix styles -> /table2.html
 app.get('/table:num.html', (req, res) => res.send(getTableHTML(req.params.num)));
-
-// Pattern C: Matches flat variants -> /table2
 app.get('/table:num', (req, res) => res.send(getTableHTML(req.params.num)));
-
 
 // Kitchen Routing Configurations
 app.get('/kitchen', (req, res) => res.send(kitchenHTML));
